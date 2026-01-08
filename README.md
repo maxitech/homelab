@@ -33,14 +33,14 @@
 1. cd /opt/immich
 2. nano .env
    - makte following changes(copy first line and comment out, paste line and change path to nas:
-     #IMMICH_MEDIA_LOCATION=/opt/immich/upload
-     IMMICH_MEDIA_LOCATION=/mnt/nas/upload
+     - #IMMICH_MEDIA_LOCATION=/opt/immich/upload
+     - IMMICH_MEDIA_LOCATION=/mnt/nas/upload
 ### create new upload link in app folder
 1. cd /opt/immich/app
 2. ls -l
    - this: upload -> /opt/immich/upload
 3. backup file: mv upload upload-original
-4. create new link: ln -s /mnt/nas/upload
+4. create new link: ln -s /mnt/nas/upload upload
    - verify with: ls -l and check for the new link
 5. change owner of file: chown -R immich:immich upload
 6. ls -l and now you should see upload is now owned by: immich immich instead of root root
