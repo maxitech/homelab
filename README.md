@@ -18,9 +18,9 @@
 7. mount | grep immich check if mounted
    If mount is shown correct, we know that the line in fstab was added correctly
 ### Now pass mount to lxc
-1. pct set <CONTAINER ID> --mp0 /mnt/immich-nas,mp=/mnt/nas
+1. pct set [CONTAINER ID] --mp0 /mnt/immich-nas,mp=/mnt/nas
    #### Check if all correct
-   -  more /etc/pve/lxc/<CONTAINER ID>.conf
+   -  more /etc/pve/lxc/[CONTAINER ID].conf
    -  scroll down and look for line: mp0: /mnt/immich-nas,mp=/mnt/nas
 2. Head over to LXC shell and look if NAS is visible to the LXC
    - ls -lF /mnt/nas
