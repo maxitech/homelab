@@ -1,6 +1,6 @@
 # homelab
 ## PBS
-1. apt install cifs-uitils
+1. apt install cifs-utils
 2. mkdir /mnt/nas
 3. nano /etc/samba/.smbcreds
    - format: username=smb_username, password=smb_password
