@@ -52,4 +52,27 @@
 5. ls -l
 6. chown -R immich:immich upload
 7. ls -l to verify your changes
+
+### Change PVE Name
+Stop all VM/CT
+
+Connect via SSH to the host
+
+nano /etc/hosts
+nano /etc/hostname
+nano /etc/postfix/main.cf
+
+hostnamectl set-hostname <newNode>
+systemctl restart pveproxy
+systemctl restart pvedaemon
+
+cp -R /etc/pve/nodes/<oldNode>/ /root/oldconfig
+mv /etc/pve/nodes/<oldNode>/lxc/* /etc/pve/nodes/<newNode>/lxc
+mv /etc/pve/nodes/<oldNode>/qemu-server/* /etc/pve/nodes/<newNode>/qemu-server
+
+rm -r /etc/pve/nodes/<oldNode>
+
+reboot
+
+nano /etc/pve/storage.cfg
    
