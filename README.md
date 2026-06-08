@@ -9,7 +9,7 @@
 
 Infrastructure-as-code, automation scripts, and operational runbooks for my self-hosted home lab — built around **Proxmox VE**, **Docker**, **Packer**, and a segmented **UniFi** network.
 
-This repository documents *how* the lab is organized and *why*, so that its layout, naming, and conventions stay consistent and reproducible over time.
+This repository documents _how_ the lab is organized and _why_, so that its layout, naming, and conventions stay consistent and reproducible over time.
 
 ## Table of Contents
 
@@ -17,6 +17,7 @@ This repository documents *how* the lab is organized and *why*, so that its layo
 - [Network Architecture](#network-architecture)
   - [VLAN Segmentation](#vlan-segmentation)
   - [IP Addressing Scheme](#ip-addressing-scheme)
+  - [Remote Access](#remote-access)
 - [Compute Architecture](#compute-architecture)
   - [Proxmox VM/CT ID Ranges](#proxmox-vmct-id-ranges)
 - [Repository Structure](#repository-structure)
@@ -46,19 +47,19 @@ The sections below describe both, plus the contents of this repository and the o
 
 All network segmentation is managed in UniFi. Each VLAN isolates traffic by trust level and function:
 
-| VLAN ID | Name | Purpose |
-|--:|---|---|
-| 1   | `MANAGEMENT`        | UniFi infrastructure devices (access points, switches, gateway, etc.) |
-| 10  | `SERVER (PHYSICAL)` | Physical server hosts |
-| 20  | `CRITICAL_SERVICES` | Core infrastructure services (e.g. DNS) |
-| 30  | `SERVICES (APPS)`   | General-purpose application services |
-| 40  | `STORAGE`           | Storage systems (NAS, backup targets) |
-| 50  | `DEVOPS`            | DevOps and automation tooling |
-| 60  | `VM_PLAYGROUND`     | Sandbox / experimental VMs |
-| 100 | `TRUSTED`           | Trusted personal clients |
-| 150 | `IOT`               | IoT devices |
-| 200 | `GUEST`             | Guest network |
-| 250 | `UNTRUSTED`         | Default VLAN assigned to unused switch ports — isolates any device plugged in without explicit configuration |
+| VLAN ID | Name                | Purpose                                                                                                      |
+| ------: | ------------------- | ------------------------------------------------------------------------------------------------------------ |
+|       1 | `MANAGEMENT`        | UniFi infrastructure devices (access points, switches, gateway, etc.)                                        |
+|      10 | `SERVER (PHYSICAL)` | Physical server hosts                                                                                        |
+|      20 | `CRITICAL_SERVICES` | Core infrastructure services (e.g. DNS)                                                                      |
+|      30 | `SERVICES (APPS)`   | General-purpose application services                                                                         |
+|      40 | `STORAGE`           | Storage systems (NAS, backup targets)                                                                        |
+|      50 | `DEVOPS`            | DevOps and automation tooling                                                                                |
+|      60 | `VM_PLAYGROUND`     | Sandbox / experimental VMs                                                                                   |
+|     100 | `TRUSTED`           | Trusted personal clients                                                                                     |
+|     150 | `IOT`               | IoT devices                                                                                                  |
+|     200 | `GUEST`             | Guest network                                                                                                |
+|     250 | `UNTRUSTED`         | Default VLAN assigned to unused switch ports — isolates any device plugged in without explicit configuration |
 
 ### IP Addressing Scheme
 
@@ -68,13 +69,49 @@ Every VLAN is provisioned as its own `/24` (`255.255.255.0`) subnet, addressed u
 10.<location>.<vlan_id>.<host>
 ```
 
-| Octet | Meaning |
-|---|---|
-| `location` | Fixed identifier for the physical site |
+| Octet      | Meaning                                                             |
+| ---------- | ------------------------------------------------------------------- |
+| `location` | Fixed identifier for the physical site                              |
 | `vlan_id`  | The VLAN ID from the table above, used directly as the subnet octet |
-| `host`     | Host/client identifier within that subnet |
+| `host`     | Host/client identifier within that subnet                           |
 
 For example, the `SERVICES (APPS)` VLAN (`30`) at a given site resolves to `10.<location>.30.0/24`. This keeps subnet membership self-describing — the VLAN a host belongs to can be read directly from its IP address.
+
+### Remote Access
+
+No service is reachable directly from personal devices — every connection follows the same bastion pattern:
+
+1. **SSH key-based authentication only.** Password authentication is disabled on every VM (see [`11-disable-pwd-ssh-auth.sh`](proxmox/vm-core-scripts/vm-setup/11-disable-pwd-ssh-auth.sh)); access is by Ed25519 key pair.
+2. **A single jump host (bastion)** sitting in the `MANAGEMENT` VLAN is the only host reachable directly. Every other VM is reached by `ProxyJump`-ing through it via SSH.
+3. **Web UIs are reached through SSH local port forwarding**, rather than being exposed on the network. Each dashboard (Proxmox, AdGuard Home, Nginx Proxy Manager, ...) is tunneled to a local port on demand through the jump host.
+
+A sanitized excerpt of the SSH client config that drives this (the real version, with actual hosts/IPs/usernames, intentionally lives outside this repository — see the note below):
+
+```sshconfig
+# The bastion — the only host reachable directly, sitting in the MANAGEMENT VLAN
+Host jumphost
+    HostName 10.<location>.50.<host>
+    User <username>
+    IdentityFile ~/.ssh/id_ed25519
+
+# Any other VM is reached *through* the jump host...
+Host proxmox-ui
+    HostName 10.<location>.10.<host>
+    User <username>
+    ProxyJump jumphost
+    LocalForward 8006 127.0.0.1:8006
+    IdentityFile ~/.ssh/id_ed25519
+
+# ...and a service's web UI is tunneled to a local port on demand
+Host nginx-proxy-manager
+    HostName 10.<location>.30.<host>
+    User <username>
+    ProxyJump jumphost
+    LocalForward 8081 10.<location>.30.<host>:81
+    IdentityFile ~/.ssh/id_ed25519
+```
+
+> **Note:** `~/.ssh/config` is not version-controlled in this repository — it encodes real internal hostnames, IP addresses, and usernames. It's kept in a private location instead.
 
 ## Compute Architecture
 
@@ -82,14 +119,14 @@ For example, the `SERVICES (APPS)` VLAN (`30`) at a given site resolves to `10.<
 
 VM and container IDs on the Proxmox node are allocated from fixed ranges, so a resource's role is recognizable from its ID alone — no need to cross-reference a separate inventory:
 
-| ID Range | Category | Description |
-|---|---|---|
-| `10000`–`19999` | Management        | Management VMs |
+| ID Range        | Category          | Description                                   |
+| --------------- | ----------------- | --------------------------------------------- |
+| `10000`–`19999` | Management        | Management VMs                                |
 | `20000`–`29999` | Critical Services | Core infrastructure (e.g. DNS, reverse proxy) |
-| `30000`–`39999` | Services / Apps   | General-purpose application workloads |
-| `40000`–`49999` | DevOps            | CI/CD and automation tooling |
-| `80000`–`89999` | Test / Sandbox    | Disposable, experimental VMs |
-| `90000`–`99999` | Templates         | Golden images (e.g. Packer-built templates) |
+| `30000`–`39999` | Services / Apps   | General-purpose application workloads         |
+| `40000`–`49999` | DevOps            | CI/CD and automation tooling                  |
+| `80000`–`89999` | Test / Sandbox    | Disposable, experimental VMs                  |
+| `90000`–`99999` | Templates         | Golden images (e.g. Packer-built templates)   |
 
 Ranges not listed above are currently unallocated and reserved for future use.
 
@@ -129,13 +166,13 @@ The build:
 
 [`proxmox/vm-core-scripts/vm-setup`](proxmox/vm-core-scripts/vm-setup) contains a small, ordered set of scripts that bring a freshly cloned VM into a known-good baseline state. [`run-all.sh`](proxmox/vm-core-scripts/vm-setup/run-all.sh) runs them in sequence:
 
-| Script | Purpose |
-|---|---|
-| [`00-system-update.sh`](proxmox/vm-core-scripts/vm-setup/00-system-update.sh) | Updates and upgrades all system packages |
-| [`10-disable-default-user.sh`](proxmox/vm-core-scripts/vm-setup/10-disable-default-user.sh) | Locks and expires the default cloud-init user |
-| [`11-disable-pwd-ssh-auth.sh`](proxmox/vm-core-scripts/vm-setup/11-disable-pwd-ssh-auth.sh) | Disables SSH password authentication (key-based auth only) |
-| [`20-install-docker.sh`](proxmox/vm-core-scripts/vm-setup/20-install-docker.sh) | Installs Docker Engine and the Compose plugin, and adds the invoking user to the `docker` group |
-| [`30-test-docker.sh`](proxmox/vm-core-scripts/vm-setup/30-test-docker.sh) | Verifies the installation by running the `hello-world` container |
+| Script                                                                                      | Purpose                                                                                         |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [`00-system-update.sh`](proxmox/vm-core-scripts/vm-setup/00-system-update.sh)               | Updates and upgrades all system packages                                                        |
+| [`10-disable-default-user.sh`](proxmox/vm-core-scripts/vm-setup/10-disable-default-user.sh) | Locks and expires the default cloud-init user                                                   |
+| [`11-disable-pwd-ssh-auth.sh`](proxmox/vm-core-scripts/vm-setup/11-disable-pwd-ssh-auth.sh) | Disables SSH password authentication (key-based auth only)                                      |
+| [`20-install-docker.sh`](proxmox/vm-core-scripts/vm-setup/20-install-docker.sh)             | Installs Docker Engine and the Compose plugin, and adds the invoking user to the `docker` group |
+| [`30-test-docker.sh`](proxmox/vm-core-scripts/vm-setup/30-test-docker.sh)                   | Verifies the installation by running the `hello-world` container                                |
 
 Run it with:
 
@@ -149,9 +186,9 @@ Docker installation (and the subsequent reboot) is prompted for interactively, s
 
 [`proxmox/docker`](proxmox/docker) holds the Compose definitions for services running on top of the VM baseline above.
 
-| Service | Description | Compose File |
-|---|---|---|
-| **AdGuard Home** | Network-wide DNS server with ad- and tracker-blocking | [`docker/adguard/docker-compose.yml`](proxmox/docker/adguard/docker-compose.yml) |
+| Service                 | Description                                                                | Compose File                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **AdGuard Home**        | Network-wide DNS server with ad- and tracker-blocking                      | [`docker/adguard/docker-compose.yml`](proxmox/docker/adguard/docker-compose.yml)                         |
 | **Nginx Proxy Manager** | Reverse proxy with a web UI for managing TLS certificates and host routing | [`docker/nginx-proxy-manager/docker-compose.yml`](proxmox/docker/nginx-proxy-manager/docker-compose.yml) |
 
 ### Proxmox Backup Server: Mounting NAS Storage
@@ -249,6 +286,7 @@ chown -R immich:immich upload
 
 1. Stop all VMs and containers on the node.
 2. Connect via SSH and update the hostname references:
+
    ```bash
    nano /etc/hosts
    nano /etc/hostname
@@ -258,7 +296,9 @@ chown -R immich:immich upload
    systemctl restart pveproxy
    systemctl restart pvedaemon
    ```
+
 3. Migrate the cluster filesystem entries to the new node name:
+
    ```bash
    cp -R /etc/pve/nodes/<old_node>/ /root/oldconfig
    mv /etc/pve/nodes/<old_node>/lxc/* /etc/pve/nodes/<new_node>/lxc
@@ -267,6 +307,7 @@ chown -R immich:immich upload
    rm -r /etc/pve/nodes/<old_node>
    reboot
    ```
+
 4. Update storage references:
    ```bash
    nano /etc/pve/storage.cfg
