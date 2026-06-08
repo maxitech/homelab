@@ -5,6 +5,7 @@
 ![Packer](https://img.shields.io/badge/Packer-02A8EF?style=flat-square&logoColor=white)
 ![UniFi](https://img.shields.io/badge/UniFi-0559C9?style=flat-square&logoColor=white)
 ![Shell Script](https://img.shields.io/badge/Shell%20Script-4EAA25?style=flat-square&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)
 
 Infrastructure-as-code, automation scripts, and operational runbooks for my self-hosted home lab — built around **Proxmox VE**, **Docker**, **Packer**, and a segmented **UniFi** network.
 
@@ -26,6 +27,7 @@ This repository documents *how* the lab is organized and *why*, so that its layo
   - [Proxmox Backup Server: Mounting NAS Storage](#proxmox-backup-server-mounting-nas-storage)
   - [Immich: Migrating Photo Storage to a NAS](#immich-migrating-photo-storage-to-a-nas)
   - [Renaming a Proxmox VE Node](#renaming-a-proxmox-ve-node)
+- [License](#license)
 
 ## Overview
 
@@ -269,3 +271,7 @@ chown -R immich:immich upload
    ```bash
    nano /etc/pve/storage.cfg
    ```
+
+## License
+
+This repository is licensed under the [MIT License](LICENSE).
