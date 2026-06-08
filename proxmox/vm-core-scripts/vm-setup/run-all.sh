@@ -14,9 +14,25 @@ echo "=== Running 10-disable-default-user.sh ==="
 bash "$SCRIPT_DIR/10-disable-default-user.sh"
 echo
 
-echo "=== Running 11-disable-pwd-ssh-auth.sh ==="
-bash "$SCRIPT_DIR/11-disable-pwd-ssh-auth.sh"
+# -------------------------------
+# Optional SSH password auth disable
+# -------------------------------
+echo -n "Disable SSH password authentication? (y/n): "
+read DISABLE_SSH_PW < /dev/tty
+
+if [[ "$DISABLE_SSH_PW" =~ ^[Yy]$ ]]; then
+    echo
+    echo "=== Running 11-disable-pwd-ssh-auth.sh ==="
+    bash "$SCRIPT_DIR/11-disable-pwd-ssh-auth.sh"
+    SSH_PW_DISABLED=true
+else
+    echo
+    echo "SSH password authentication NOT disabled."
+    SSH_PW_DISABLED=false
+fi
+
 echo
+
 
 # -------------------------------
 # Optional Docker installation
